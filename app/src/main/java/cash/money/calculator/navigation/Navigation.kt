@@ -16,7 +16,8 @@ object AppRoutes {
 
 @Composable
 fun AppNavigation(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    onThemeChange: (String) -> Unit = {}
 ) {
     NavHost(
         navController = navController,
@@ -27,7 +28,8 @@ fun AppNavigation(
             CashCalculatorScreen(
                 onNavigateToHistory = {
                     navController.navigate(AppRoutes.HISTORY)
-                }
+                },
+                onThemeChange = onThemeChange
             )
         }
 

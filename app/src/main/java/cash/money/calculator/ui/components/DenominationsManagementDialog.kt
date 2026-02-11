@@ -21,8 +21,16 @@ fun DenominationsManagementDialog(
     onDismiss: () -> Unit,
     onSave: (List<Int>) -> Unit
 ) {
-    val allDenominations = listOf(2000, 500, 200, 100, 50, 20, 10, 5, 2, 1)
+    val defaultValues = listOf(2000, 500, 200, 100, 50, 20, 10, 5, 2, 1)
+    var customDenominations by remember { 
+        mutableStateOf(enabledDenominations.filter { it !in defaultValues }) 
+    }
+    
+    val allFixedDenominations = defaultValues
     var selectedList by remember { mutableStateOf(enabledDenominations.toSet()) }
+    
+    var customValueInput by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -44,41 +52,106 @@ fun DenominationsManagementDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Select the notes/coins you want to display on the main screen.",
+                    text = "Toggle denominations to show/hide them on the main screen.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
 
                 LazyColumn(
-                    modifier = Modifier.heightIn(max = 400.dp),
+                    modifier = Modifier.heightIn(max = 300.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(allDenominations) { value ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                    item {
+                        Text(
+                            "Fixed Denominations",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(allFixedDenominations) { value ->
+                        DenominationToggleRow(
+                            value = value,
+                            isSelected = selectedList.contains(value),
+                            onToggle = { checked ->
+                                selectedList = if (checked) selectedList + value else selectedList - value
+                            }
+                        )
+                    }
+                    
+                    if (customDenominations.isNotEmpty()) {
+                        item {
                             Text(
-                                text = "₹ $value",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium
+                                "Custom Denominations",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
                             )
-                            Checkbox(
-                                checked = selectedList.contains(value),
-                                onCheckedChange = { checked ->
-                                    selectedList = if (checked) {
-                                        selectedList + value
-                                    } else {
-                                        selectedList - value
-                                    }
+                        }
+                        items(customDenominations) { value ->
+                            DenominationToggleRow(
+                                value = value,
+                                isSelected = selectedList.contains(value),
+                                onToggle = { checked ->
+                                    selectedList = if (checked) selectedList + value else selectedList - value
                                 }
                             )
                         }
                     }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                // Add Custom Section
+                Text(
+                    "Add Custom Denomination",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = customValueInput,
+                        onValueChange = { 
+                            customValueInput = it
+                            errorMessage = null
+                        },
+                        placeholder = { Text("Value (e.g. 75)") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        isError = errorMessage != null,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    Button(
+                        onClick = {
+                            val value = customValueInput.toIntOrNull()
+                            when {
+                                value == null || value <= 0 -> errorMessage = "Invalid"
+                                (allFixedDenominations + customDenominations).contains(value) -> errorMessage = "Exists"
+                                else -> {
+                                    customDenominations = (customDenominations + value).sortedByDescending { it }
+                                    selectedList = selectedList + value
+                                    customValueInput = ""
+                                }
+                            }
+                        },
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Add")
+                    }
+                }
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
         },
@@ -98,3 +171,33 @@ fun DenominationsManagementDialog(
         shape = RoundedCornerShape(20.dp)
     )
 }
+
+@Composable
+private fun DenominationToggleRow(
+    value: Int,
+    isSelected: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "₹ $value",
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium
+        )
+        Switch(
+            checked = isSelected,
+            onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        )
+    }
+}
+

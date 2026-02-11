@@ -26,4 +26,14 @@ class PreferenceManager(context: Context) {
             .putStringSet(KEY_DENOMINATIONS, denominations.map { it.toString() }.toSet())
             .apply()
     }
+
+    fun getAppTheme(): String {
+        return sharedPreferences.getString("app_theme", "Light") ?: "Light"
+    }
+
+    fun saveAppTheme(theme: String) {
+        sharedPreferences.edit()
+            .putString("app_theme", theme)
+            .apply()
+    }
 }

@@ -1,5 +1,6 @@
 package cash.money.calculator.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,13 +14,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cash.money.calculator.data.HistoryManager
+
 import cash.money.calculator.data.PreferenceManager
 import cash.money.calculator.ui.components.DenominationsManagementDialog
 import kotlinx.coroutines.launch
@@ -28,6 +33,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun CashCalculatorScreen(
     onNavigateToHistory: () -> Unit,
+    onThemeChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -38,7 +44,9 @@ fun CashCalculatorScreen(
 
     var showManagementDialog by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
-    var showAddDialog by remember { mutableStateOf(false) }
+
+    // Theme state for the drawer UI
+    var currentTheme by remember { mutableStateOf(prefManager.getAppTheme()) }
     
     // New Dialogs for About/Contact
     var showAboutDialog by remember { mutableStateOf(false) }
@@ -51,175 +59,308 @@ fun CashCalculatorScreen(
 
     val totalAmount = selectedDenominations.sumOf { it.value * it.quantity }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier.width(300.dp),
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-                drawerTonalElevation = 4.dp
-            ) {
-                Spacer(Modifier.height(24.dp))
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.AccountBalanceWallet,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Text(
-                        "Cash Calculator",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.History, null) },
-                    label = { Text("Saved History") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onNavigateToHistory()
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Settings, null) },
-                    label = { Text("Denominations Management") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        showManagementDialog = true
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Info, null) },
-                    label = { Text("About Us") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        showAboutDialog = true
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Email, null) },
-                    label = { Text("Contact Us") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        showContactDialog = true
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-            }
-        }
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    ModalDrawerSheet(
+                        modifier = Modifier.width(300.dp),
+                        drawerContainerColor = MaterialTheme.colorScheme.surface,
+                        drawerTonalElevation = 4.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(top = 32.dp, bottom = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountBalanceWallet,
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Text(
-                                text = "Cash Count",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Menu"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                )
-            },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { showAddDialog = true },
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    contentColor = MaterialTheme.colorScheme.onSecondary
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Custom Denomination"
-                    )
-                }
-            }
-        ) { paddingValues ->
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = paddingValues.calculateTopPadding() + 16.dp,
-                    bottom = paddingValues.calculateBottomPadding() + 88.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    TotalCard(
-                        total = totalAmount,
-                        onSave = { showSaveDialog = true },
-                        onReset = {
-                            selectedDenominations = selectedDenominations.map {
-                                it.copy(quantity = 0)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                items(
-                    items = selectedDenominations,
-                    key = { it.value }
-                ) { item ->
-                    DenominationCardWithInput(
-                        item = item,
-                        onQuantityChange = { newQuantity ->
-                            selectedDenominations = selectedDenominations.map {
-                                if (it.value == item.value) it.copy(quantity = newQuantity)
-                                else it
-                            }
-                        },
-                        onDelete = if (!isDefaultDenomination(item.value)) {
-                            {
-                                selectedDenominations = selectedDenominations.filter {
-                                    it.value != item.value
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.AccountBalanceWallet,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(32.dp)
+                                    )
                                 }
                             }
-                        } else null
-                    )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "Cash Calculator",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = (-0.5).sp
+                                )
+                                Text(
+                                    "Professional Calculator",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                        
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                        
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.History, null) },
+                            label = { Text("Saved History") },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                onNavigateToHistory()
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.Settings, null) },
+                            label = { Text("Denominations Settings") },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                showManagementDialog = true
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp, horizontal = 16.dp))
+                        
+                        // Theme Management Section
+                        Text(
+                            "Theme Mode",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                        )
+                        
+                        Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                            listOf("Light", "Dark").forEach { theme ->
+                                NavigationDrawerItem(
+                                    icon = {
+                                        Icon(
+                                            imageVector = when(theme) {
+                                                "Light" -> Icons.Default.LightMode
+                                                else -> Icons.Default.DarkMode
+                                            },
+                                            contentDescription = null
+                                        )
+                                    },
+                                    label = { Text(theme) },
+                                    selected = currentTheme == theme,
+                                    onClick = {
+                                        currentTheme = theme
+                                        onThemeChange(theme)
+                                    },
+                                    modifier = Modifier.height(48.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.weight(1f))
+                        
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.Info, null) },
+                            label = { Text("About") },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                showAboutDialog = true
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.Email, null) },
+                            label = { Text("Support") },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                showContactDialog = true
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
+            }
+        ) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Scaffold(
+                    topBar = {
+                        CenterAlignedTopAppBar(
+                            title = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.AccountBalanceWallet,
+                                        null,
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Cash Calculator",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            },
+                            actions = {
+                                IconButton(
+                                    onClick = { scope.launch { drawerState.open() } },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Menu")
+                                }
+                            },
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                                actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            windowInsets = TopAppBarDefaults.windowInsets
+                        )
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    },
+                    bottomBar = {
+                        Column {
+                            HorizontalDivider(
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface,
+                                tonalElevation = 1.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                                        .navigationBarsPadding(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            selectedDenominations = selectedDenominations.map {
+                                                it.copy(quantity = 0)
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f).height(52.dp),
+                                        shape = RoundedCornerShape(14.dp),
+                                        enabled = totalAmount > 0,
+                                        colors = ButtonDefaults.textButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(20.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Reset", fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                    }
+                                    
+                                    Button(
+                                        onClick = { showSaveDialog = true },
+                                        modifier = Modifier.weight(1.2f).height(52.dp),
+                                        shape = RoundedCornerShape(14.dp),
+                                        enabled = totalAmount > 0,
+                                        elevation = ButtonDefaults.buttonElevation(
+                                            defaultElevation = 4.dp,
+                                            pressedElevation = 2.dp
+                                        ),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Save, null, modifier = Modifier.size(20.dp))
+                                        Spacer(Modifier.width(10.dp))
+                                        Text("Save Report", fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ) { paddingValues ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .background(MaterialTheme.colorScheme.background)
+                    ) {
+                        // Compact Total Banner
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Total Amount",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Text(
+                                    text = "₹ $totalAmount",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(
+                                items = selectedDenominations,
+                                key = { it.value }
+                            ) { item ->
+                                DenominationCardWithInput(
+                                    item = item,
+                                    onQuantityChange = { newQuantity ->
+                                        selectedDenominations = selectedDenominations.map {
+                                            if (it.value == item.value) it.copy(quantity = newQuantity)
+                                            else it
+                                        }
+                                    },
+                                    onDelete = if (!isDefaultDenomination(item.value)) {
+                                        {
+                                            val newEnabled = enabledValues.filter { it != item.value }
+                                            prefManager.saveEnabledDenominations(newEnabled)
+                                            enabledValues = newEnabled
+                                        }
+                                    } else null
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+
 
     if (showManagementDialog) {
         DenominationsManagementDialog(
@@ -246,24 +387,10 @@ fun CashCalculatorScreen(
                 historyManager.saveCalculation(calculation)
                 showSaveDialog = false
                 selectedDenominations = selectedDenominations.map { it.copy(quantity = 0) }
-                // Show success snackbar or toast? Just close for now.
             }
         )
     }
 
-    if (showAddDialog) {
-        AddCustomDenominationDialog(
-            existingValues = selectedDenominations.map { it.value },
-            onDismiss = { showAddDialog = false },
-            onAdd = { newValue ->
-                selectedDenominations = (selectedDenominations + DenominationItem(newValue, 0))
-                    .sortedByDescending { it.value }
-                showAddDialog = false
-            }
-        )
-    }
-    
-    // About Dialog
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
@@ -278,7 +405,6 @@ fun CashCalculatorScreen(
         )
     }
 
-    // Contact Dialog
     if (showContactDialog) {
         AlertDialog(
             onDismissRequest = { showContactDialog = false },
@@ -299,7 +425,6 @@ fun CashCalculatorScreen(
 }
 
 
-// Check if denomination is default
 private fun isDefaultDenomination(value: Int): Boolean {
     return value in listOf(2000, 500, 200, 100, 50, 20, 10, 5, 2, 1)
 }
@@ -308,84 +433,6 @@ data class DenominationItem(
     val value: Int,
     val quantity: Int = 0
 )
-
-@Composable
-private fun TotalCard(
-    total: Int,
-    onSave: () -> Unit,
-    onReset: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Total Amount",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "₹ $total",
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            // Action Buttons Row
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
-            ) {
-                // Save Button
-                Button(
-                    onClick = onSave,
-                    enabled = total > 0,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Save,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Save")
-                }
-
-                // Reset Button
-                OutlinedButton(
-                    onClick = onReset,
-                    enabled = total > 0,
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Reset")
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun DenominationCardWithInput(
@@ -397,65 +444,61 @@ private fun DenominationCardWithInput(
         mutableStateOf(if (item.quantity == 0) "" else item.quantity.toString())
     }
 
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (item.quantity > 0)
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-            else
-                MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(16.dp)
+        color = if (item.quantity > 0)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
+        else
+            MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp),
+        border = if (item.quantity > 0)
+            BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+        else
+            null,
+        shadowElevation = if (item.quantity > 0) 0.dp else 0.5.dp
     ) {
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
+                .padding(horizontal = 10.dp, vertical = 1.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Denomination Value
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(1.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(1.dp)
+//                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.CurrencyRupee,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = "${item.value}",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 20.sp
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 if (item.quantity > 0) {
                     Text(
-                        text = "Total: ₹ ${item.value * item.quantity}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 12.sp
+                        text = "₹ ${item.value * item.quantity}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            // Quantity Controls
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Decrease button
                 IconButton(
                     onClick = {
                         if (item.quantity > 0) {
@@ -465,7 +508,7 @@ private fun DenominationCardWithInput(
                         }
                     },
                     enabled = item.quantity > 0,
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         Icons.Default.Remove,
@@ -474,12 +517,11 @@ private fun DenominationCardWithInput(
                         tint = if (item.quantity > 0)
                             MaterialTheme.colorScheme.primary
                         else
-                            MaterialTheme.colorScheme.outline
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
                     )
                 }
 
-                // Input Box
-                OutlinedTextField(
+                TextField(
                     value = inputValue,
                     onValueChange = { newValue ->
                         if (newValue.isEmpty()) {
@@ -493,36 +535,42 @@ private fun DenominationCardWithInput(
                             }
                         }
                     },
-                    modifier = Modifier.width(70.dp),
+                    modifier = Modifier.width(64.dp),
                     textStyle = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        fontSize = 16.sp
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center
                     ),
                     placeholder = {
                         Text(
                             text = "0",
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedTextColor = MaterialTheme.colorScheme.primary,
+    cursorColor = MaterialTheme.colorScheme.primary,
                     ),
                     shape = RoundedCornerShape(8.dp)
                 )
 
-                // Increase button
                 IconButton(
                     onClick = {
                         val newQty = item.quantity + 1
                         inputValue = newQty.toString()
                         onQuantityChange(newQty)
                     },
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         Icons.Default.Add,
@@ -531,26 +579,12 @@ private fun DenominationCardWithInput(
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
-
-                // Delete button (only for custom denominations)
-                if (onDelete != null) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(38.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SaveCalculationDialog(
     totalAmount: Int,
@@ -560,212 +594,122 @@ private fun SaveCalculationDialog(
     var note by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    BasicAlertDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Save,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "Save Calculation",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
+        modifier = Modifier.padding(24.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Amount display
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
+                // Header with Illustration Icon
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(20.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Save Record",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Secure your current calculation",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Amount Display Card
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                        modifier = Modifier.padding(20.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "Amount:",
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
                             text = "₹ $totalAmount",
                             style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
 
-                Text(
-                    text = "Please add a note to save this calculation 📝",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
+                // Professional Notes Input
                 OutlinedTextField(
                     value = note,
                     onValueChange = {
                         note = it
                         showError = false
                     },
-                    label = { Text("Note *") },
-                    placeholder = { Text("e.g., Daily cash count, Sales collection...") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Notes,
-                            contentDescription = null
-                        )
-                    },
-
+                    label = { Text("Reference Note") },
+                    placeholder = { Text("e.g. Morning Collection, Sales...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
                     isError = showError,
                     supportingText = if (showError) {
-                        {
-                            Text(
-                                text = "Please enter a note to continue",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
+                        { Text("Required for identification", color = MaterialTheme.colorScheme.error) }
                     } else null,
                     minLines = 2,
                     maxLines = 3,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                )
+
+                // Actions
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (note.trim().isEmpty()) {
-                        showError = true
-                    } else {
-                        onSave(note.trim())
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Cancel")
                     }
-                },
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Save")
+                    Button(
+                        onClick = {
+                            if (note.trim().isEmpty()) showError = true
+                            else onSave(note.trim())
+                        },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Save Now")
+                    }
+                }
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Cancel")
-            }
-        },
-        shape = RoundedCornerShape(20.dp)
-    )
+        }
+    }
 }
 
-@Composable
-private fun AddCustomDenominationDialog(
-    existingValues: List<Int>,
-    onDismiss: () -> Unit,
-    onAdd: (Int) -> Unit
-) {
-    var customValue by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "Add Custom Denomination",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Enter a custom denomination value that's not in the default list.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                OutlinedTextField(
-                    value = customValue,
-                    onValueChange = {
-                        customValue = it
-                        errorMessage = null
-                    },
-                    label = { Text("Denomination Value") },
-                    placeholder = { Text("e.g., 75, 250") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.CurrencyRupee,
-                            contentDescription = null
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    isError = errorMessage != null,
-                    supportingText = errorMessage?.let { { Text(it) } },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val value = customValue.toIntOrNull()
-                    when {
-                        value == null || value <= 0 -> {
-                            errorMessage = "Please enter a valid positive number"
-                        }
-                        value in existingValues -> {
-                            errorMessage = "This denomination already exists"
-                        }
-                        else -> {
-                            onAdd(value)
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Cancel")
-            }
-        },
-        shape = RoundedCornerShape(20.dp)
-    )
-}

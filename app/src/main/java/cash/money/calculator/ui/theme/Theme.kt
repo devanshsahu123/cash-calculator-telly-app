@@ -14,87 +14,95 @@ import androidx.core.view.WindowCompat
 
 // Light Color Scheme
 private val CashCalculatorLightColors = lightColorScheme(
-    primary = RoyalIndigo,
+    primary = SlateBlue,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE8EAF6),
-    onPrimaryContainer = DeepIndigo,
+    primaryContainer = Color(0xFFCFD8DC),
+    onPrimaryContainer = DarkSlate,
 
-    secondary = EmeraldGreen,
+    secondary = CoralAccent,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE8F5E9),
-    onSecondaryContainer = Color(0xFF1B5E20),
+    secondaryContainer = Color(0xFFFFE0B2),
+    onSecondaryContainer = Color(0xFFE64A19),
 
-    tertiary = GoldAccent,
-    onTertiary = Color.Black,
-    tertiaryContainer = Color(0xFFFFF9C4),
-    onTertiaryContainer = Color(0xFFF57F17),
+    tertiary = MintGreen,
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFB2DFDB),
+    onTertiaryContainer = Color(0xFF00695C),
 
-    background = SoftBackground,
-    onBackground = Color(0xFF1C1B1F),
-    surface = SurfaceWhite,
-    onSurface = Color(0xFF1C1B1F),
+    background = SoftGrey,
+    onBackground = DeepText,
+    surface = Color.White,
+    onSurface = DeepText,
     surfaceVariant = Color(0xFFECEFF1),
-    onSurfaceVariant = Color(0xFF455A64),
+    onSurfaceVariant = Color(0xFF546E7A),
 
-    error = ErrorRed,
+    error = ErrorOrange,
     onError = Color.White,
-    errorContainer = Color(0xFFFFEBEE),
-    onErrorContainer = Color(0xFFB71C1C),
+    errorContainer = Color(0xFFFFE0B2),
+    onErrorContainer = Color(0xFFE64A19),
 
-    outline = Color(0xFF78909C),
-    outlineVariant = Color(0xFFCFD8DC),
+    outline = Color(0xFF90A4AE),
+    outlineVariant = Color(0xFFB0BEC5),
     scrim = Color(0xFF000000)
 )
 
 // Dark Color Scheme
 private val CashCalculatorDarkColors = darkColorScheme(
-    primary = Color(0xFFC5CAE9),
-    onPrimary = DeepIndigo,
-    primaryContainer = RoyalIndigo,
-    onPrimaryContainer = Color(0xFFE8EAF6),
+    primary = Color(0xFF90A4AE),
+    onPrimary = DarkSlate,
+    primaryContainer = SlateBlue,
+    onPrimaryContainer = Color(0xFFCFD8DC),
 
-    secondary = Color(0xFFA5D6A7),
-    onSecondary = Color(0xFF1B5E20),
-    secondaryContainer = EmeraldGreen,
-    onSecondaryContainer = Color(0xFFE8F5E9),
+    secondary = Color(0xFFFFAB91),
+    onSecondary = Color(0xFFBF360C),
+    secondaryContainer = CoralAccent,
+    onSecondaryContainer = Color(0xFFFFE0B2),
 
-    tertiary = GoldAccent,
-    onTertiary = Color.Black,
-    tertiaryContainer = Color(0xFFF57F17),
-    onTertiaryContainer = Color(0xFFFFF9C4),
+    tertiary = Color(0xFF80CBC4),
+    onTertiary = Color(0xFF004D40),
+    tertiaryContainer = MintGreen,
+    onTertiaryContainer = Color(0xFFB2DFDB),
 
-    background = Color(0xFF121212),
-    onBackground = Color(0xFFE1E2E1),
-    surface = Color(0xFF1E1E1E),
-    onSurface = Color(0xFFE1E2E1),
-    surfaceVariant = Color(0xFF263238),
+    background = DarkSlate,
+    onBackground = Color(0xFFECEFF1),
+    surface = Color(0xFF263238),
+    onSurface = Color(0xFFECEFF1),
+    surfaceVariant = Color(0xFF37474F),
     onSurfaceVariant = Color(0xFFB0BEC5),
 
-    error = Color(0xFFEF9A9A),
-    onError = Color(0xFFB71C1C),
-    errorContainer = ErrorRed,
-    onErrorContainer = Color(0xFFFFEBEE),
+    error = Color(0xFFFFAB91),
+    onError = Color(0xFFBF360C),
+    errorContainer = ErrorOrange,
+    onErrorContainer = Color(0xFFFFE0B2),
 
-    outline = Color(0xFF90A4AE),
-    outlineVariant = Color(0xFF455A64),
+    outline = Color(0xFF78909C),
+    outlineVariant = Color(0xFF546E7A),
     scrim = Color(0xFF000000)
 )
+
 
 
 @Composable
 fun CashCalculatorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    forceTheme: String = "System",
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val isDark = when (forceTheme) {
+        "Light" -> false
+        "Dark" -> true
+        else -> darkTheme
+    }
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context)
+            if (isDark) dynamicDarkColorScheme(context)
             else dynamicLightColorScheme(context)
         }
-        darkTheme -> CashCalculatorDarkColors
+        isDark -> CashCalculatorDarkColors
         else -> CashCalculatorLightColors
     }
 
@@ -104,7 +112,7 @@ fun CashCalculatorTheme(
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
         }
     }
 
