@@ -9,8 +9,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import cash.money.calculator.data.HistoryManager
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -100,9 +102,11 @@ fun HistoryScreen(
                         history = history,
                         onClick = { showDetailDialog = history },
                         onDelete = {
-                            historyList = historyList.filter { it.id != history.id }
+                            historyManager.deleteCalculation(history.id)
+                            historyList = historyManager.getHistory()
                         }
                     )
+
                 }
             }
         }
