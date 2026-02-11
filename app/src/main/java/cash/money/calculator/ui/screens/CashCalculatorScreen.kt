@@ -91,7 +91,7 @@ fun CashCalculatorScreen(
                                     )
                                 }
                             }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(horizontalAlignment = Alignment.Start) {
                                 Text(
                                     "Cash Calculator",
                                     style = MaterialTheme.typography.headlineSmall,
