@@ -28,7 +28,7 @@ class PreferenceManager(context: Context) {
     }
 
     fun getAppTheme(): String {
-        return sharedPreferences.getString("app_theme", "Light") ?: "Light"
+        return sharedPreferences.getString("app_theme", "System") ?: "System"
     }
 
     fun saveAppTheme(theme: String) {

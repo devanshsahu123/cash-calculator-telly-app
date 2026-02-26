@@ -24,13 +24,13 @@ class HistoryManager(context: Context) {
             val obj = jsonArray.getJSONObject(i)
             val denominationsArray = obj.getJSONArray("denominations")
             val denominations = mutableListOf<DenominationItem>()
-            
+
             for (j in 0 until denominationsArray.length()) {
                 val denObj = denominationsArray.getJSONObject(j)
                 denominations.add(
                     DenominationItem(
                         value = denObj.getInt("value"),
-                        quantity = denObj.getInt("quantity")
+                        quantity = denObj.getLong("quantity")
                     )
                 )
             }
@@ -38,7 +38,7 @@ class HistoryManager(context: Context) {
             history.add(
                 CalculationHistory(
                     id = obj.getString("id"),
-                    total = obj.getInt("total"),
+                    total = obj.getLong("total"),
                     denominations = denominations,
                     note = obj.getString("note"),
                     timestamp = obj.getLong("timestamp")
@@ -56,6 +56,11 @@ class HistoryManager(context: Context) {
 
     fun deleteCalculation(id: String) {
         val history = getHistory().filter { it.id != id }
+        saveHistoryList(history)
+    }
+
+    fun updateCalculation(updated: CalculationHistory) {
+        val history = getHistory().map { if (it.id == updated.id) updated else it }
         saveHistoryList(history)
     }
 
