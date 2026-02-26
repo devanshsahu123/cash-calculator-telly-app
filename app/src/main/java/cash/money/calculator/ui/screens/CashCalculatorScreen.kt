@@ -24,10 +24,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cash.money.calculator.data.HistoryManager
-
 import cash.money.calculator.data.PreferenceManager
 import cash.money.calculator.ui.components.DenominationsManagementDialog
 import kotlinx.coroutines.launch
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,20 +44,21 @@ fun CashCalculatorScreen(
 
     var showManagementDialog by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
+    var showResetConfirmDialog by remember { mutableStateOf(false) }
 
     // Theme state for the drawer UI
     var currentTheme by remember { mutableStateOf(prefManager.getAppTheme()) }
-    
+
     // New Dialogs for About/Contact
     var showAboutDialog by remember { mutableStateOf(false) }
     var showContactDialog by remember { mutableStateOf(false) }
 
     var enabledValues by remember { mutableStateOf(prefManager.getEnabledDenominations()) }
     var selectedDenominations by remember(enabledValues) {
-        mutableStateOf(enabledValues.map { DenominationItem(it, 0) })
+        mutableStateOf(enabledValues.map { DenominationItem(it, 0L) })
     }
 
-    val totalAmount = selectedDenominations.sumOf { it.value * it.quantity }
+    val totalAmount = selectedDenominations.sumOf { it.value.toLong() * it.quantity }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         ModalNavigationDrawer(
@@ -106,9 +107,9 @@ fun CashCalculatorScreen(
                                 )
                             }
                         }
-                        
+
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                        
+
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Default.History, null) },
                             label = { Text("Saved History") },
@@ -132,7 +133,7 @@ fun CashCalculatorScreen(
                         )
 
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp, horizontal = 16.dp))
-                        
+
                         // Theme Management Section
                         Text(
                             "Theme Mode",
@@ -140,32 +141,42 @@ fun CashCalculatorScreen(
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                         )
-                        
+
                         Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                            listOf("Light", "Dark").forEach { theme ->
+                            // label → stored key mapping
+                            listOf(
+                                Triple("Default", "System", Icons.Default.Brightness6),
+                                Triple("Light",   "Light",  Icons.Default.LightMode),
+                                Triple("Dark",    "Dark",   Icons.Default.DarkMode)
+                            ).forEach { (label, key, icon) ->
                                 NavigationDrawerItem(
                                     icon = {
-                                        Icon(
-                                            imageVector = when(theme) {
-                                                "Light" -> Icons.Default.LightMode
-                                                else -> Icons.Default.DarkMode
-                                            },
-                                            contentDescription = null
-                                        )
+                                        Icon(imageVector = icon, contentDescription = null)
                                     },
-                                    label = { Text(theme) },
-                                    selected = currentTheme == theme,
+                                    label = {
+                                        Column {
+                                            Text(label)
+                                            if (label == "Default") {
+                                                Text(
+                                                    "Follows device theme",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    selected = currentTheme == key,
                                     onClick = {
-                                        currentTheme = theme
-                                        onThemeChange(theme)
+                                        currentTheme = key
+                                        onThemeChange(key)
                                     },
-                                    modifier = Modifier.height(48.dp)
+                                    modifier = Modifier.height(if (label == "Default") 56.dp else 48.dp)
                                 )
                             }
                         }
 
                         Spacer(Modifier.weight(1f))
-                        
+
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Default.Info, null) },
                             label = { Text("About") },
@@ -257,11 +268,11 @@ fun CashCalculatorScreen(
                                 ) {
                                     TextButton(
                                         onClick = {
-                                            selectedDenominations = selectedDenominations.map {
-                                                it.copy(quantity = 0)
-                                            }
+                                            if (totalAmount > 0) showResetConfirmDialog = true
                                         },
-                                        modifier = Modifier.weight(1f).height(52.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(52.dp),
                                         shape = RoundedCornerShape(14.dp),
                                         enabled = totalAmount > 0,
                                         colors = ButtonDefaults.textButtonColors(
@@ -272,10 +283,12 @@ fun CashCalculatorScreen(
                                         Spacer(Modifier.width(8.dp))
                                         Text("Reset", fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                                     }
-                                    
+
                                     Button(
                                         onClick = { showSaveDialog = true },
-                                        modifier = Modifier.weight(1.2f).height(52.dp),
+                                        modifier = Modifier
+                                            .weight(1.2f)
+                                            .height(52.dp),
                                         shape = RoundedCornerShape(14.dp),
                                         enabled = totalAmount > 0,
                                         elevation = ButtonDefaults.buttonElevation(
@@ -345,6 +358,12 @@ fun CashCalculatorScreen(
                                             else it
                                         }
                                     },
+                                    onLockToggle = {
+                                        selectedDenominations = selectedDenominations.map {
+                                            if (it.value == item.value) it.copy(isLocked = !it.isLocked)
+                                            else it
+                                        }
+                                    },  
                                     onDelete = if (!isDefaultDenomination(item.value)) {
                                         {
                                             val newEnabled = enabledValues.filter { it != item.value }
@@ -374,6 +393,54 @@ fun CashCalculatorScreen(
         )
     }
 
+    // Reset Confirmation Dialog
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text("Reset All Values?", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "This will clear all denomination quantities. This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        selectedDenominations = selectedDenominations.map { it.copy(quantity = 0L, isLocked = false) }
+                        showResetConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Reset", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetConfirmDialog = false },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
     if (showSaveDialog) {
         SaveCalculationDialog(
             totalAmount = totalAmount,
@@ -386,7 +453,7 @@ fun CashCalculatorScreen(
                 )
                 historyManager.saveCalculation(calculation)
                 showSaveDialog = false
-                selectedDenominations = selectedDenominations.map { it.copy(quantity = 0) }
+                selectedDenominations = selectedDenominations.map { it.copy(quantity = 0L, isLocked = false) }
             }
         )
     }
@@ -431,47 +498,52 @@ private fun isDefaultDenomination(value: Int): Boolean {
 
 data class DenominationItem(
     val value: Int,
-    val quantity: Int = 0
+    val quantity: Long = 0L,
+    val isLocked: Boolean = false
 )
 
 @Composable
 private fun DenominationCardWithInput(
     item: DenominationItem,
-    onQuantityChange: (Int) -> Unit,
+    onQuantityChange: (Long) -> Unit,
+    onLockToggle: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
     var inputValue by remember(item.quantity) {
-        mutableStateOf(if (item.quantity == 0) "" else item.quantity.toString())
+        mutableStateOf(if (item.quantity == 0L) "" else item.quantity.toString())
     }
+
+    val isLocked = item.isLocked
+    val subtotal = item.value.toLong() * item.quantity
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = if (item.quantity > 0)
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
-        else
-            MaterialTheme.colorScheme.surface,
+        color = when {
+            isLocked -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.08f)
+            item.quantity > 0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
+            else -> MaterialTheme.colorScheme.surface
+        },
         shape = RoundedCornerShape(12.dp),
-        border = if (item.quantity > 0)
-            BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
-        else
-            null,
-        shadowElevation = if (item.quantity > 0) 0.dp else 0.5.dp
+        border = when {
+            isLocked -> BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f))
+            item.quantity > 0 -> BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+            else -> null
+        },
+        shadowElevation = if (item.quantity > 0 || isLocked) 0.dp else 0.5.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 1.dp),
+                .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // ─── Left: denomination value + subtotal ───
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-//                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.CurrencyRupee,
                         contentDescription = null,
@@ -487,7 +559,7 @@ private fun DenominationCardWithInput(
                 }
                 if (item.quantity > 0) {
                     Text(
-                        text = "₹ ${item.value * item.quantity}",
+                        text = "₹ $subtotal",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         fontWeight = FontWeight.Bold
@@ -495,47 +567,55 @@ private fun DenominationCardWithInput(
                 }
             }
 
+            // ─── Right: − | Input | + | Lock | (Delete) ───
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
+                // Decrement
                 IconButton(
                     onClick = {
-                        if (item.quantity > 0) {
+                        if (!isLocked && item.quantity > 0) {
                             val newQty = item.quantity - 1
-                            inputValue = if (newQty == 0) "" else newQty.toString()
+                            inputValue = if (newQty == 0L) "" else newQty.toString()
                             onQuantityChange(newQty)
                         }
                     },
-                    enabled = item.quantity > 0,
+                    enabled = item.quantity > 0 && !isLocked,
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         Icons.Default.Remove,
                         contentDescription = "Decrease",
                         modifier = Modifier.size(20.dp),
-                        tint = if (item.quantity > 0)
+                        tint = if (item.quantity > 0 && !isLocked)
                             MaterialTheme.colorScheme.primary
                         else
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                     )
                 }
 
+                // Quantity text field
                 TextField(
                     value = inputValue,
                     onValueChange = { newValue ->
-                        if (newValue.isEmpty()) {
-                            inputValue = ""
-                            onQuantityChange(0)
-                        } else {
-                            val quantity = newValue.filter { it.isDigit() }.toIntOrNull()
-                            if (quantity != null && quantity >= 0 && quantity <= 9999) {
-                                inputValue = quantity.toString()
-                                onQuantityChange(quantity)
+                        if (!isLocked) {
+                            if (newValue.isEmpty()) {
+                                inputValue = ""
+                                onQuantityChange(0L)
+                            } else {
+                                // Allow any positive number (no upper cap)
+                                val filtered = newValue.filter { it.isDigit() }
+                                val qty = filtered.toLongOrNull()
+                                if (qty != null && qty >= 0) {
+                                    inputValue = qty.toString()
+                                    onQuantityChange(qty)
+                                }
                             }
                         }
                     },
-                    modifier = Modifier.width(64.dp),
+                    readOnly = isLocked,
+                    modifier = Modifier.width(80.dp),
                     textStyle = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.ExtraBold,
                         textAlign = TextAlign.Center
@@ -556,28 +636,65 @@ private fun DenominationCardWithInput(
                         disabledContainerColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
-
                         unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-    focusedTextColor = MaterialTheme.colorScheme.primary,
-    cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary,
                     ),
                     shape = RoundedCornerShape(8.dp)
                 )
 
+                // Increment
                 IconButton(
                     onClick = {
-                        val newQty = item.quantity + 1
-                        inputValue = newQty.toString()
-                        onQuantityChange(newQty)
+                        if (!isLocked) {
+                            val newQty = item.quantity + 1
+                            inputValue = newQty.toString()
+                            onQuantityChange(newQty)
+                        }
                     },
+                    enabled = !isLocked,
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Increase",
                         modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = if (!isLocked)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                     )
+                }
+
+                // Lock button (after +)
+                IconButton(
+                    onClick = onLockToggle,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                        contentDescription = if (isLocked) "Unlock row" else "Lock row",
+                        modifier = Modifier.size(18.dp),
+                        tint = if (isLocked)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                }
+
+                // Delete (non-default denominations only)
+                if (onDelete != null) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Remove denomination",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
         }
@@ -587,7 +704,7 @@ private fun DenominationCardWithInput(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SaveCalculationDialog(
-    totalAmount: Int,
+    totalAmount: Long,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit
 ) {
@@ -596,7 +713,7 @@ private fun SaveCalculationDialog(
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.padding(24.dp)
+        modifier = Modifier.padding(20.dp)
     ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
@@ -609,11 +726,14 @@ private fun SaveCalculationDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Header with Illustration Icon
+                // ── Header icon ──
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(20.dp)),
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            RoundedCornerShape(20.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -624,7 +744,11 @@ private fun SaveCalculationDialog(
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // ── Title + subtitle ──
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
                         text = "Save Record",
                         style = MaterialTheme.typography.headlineSmall,
@@ -637,32 +761,46 @@ private fun SaveCalculationDialog(
                     )
                 }
 
-                // Amount Display Card
+                // ── Amount display ──
                 Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(20.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Amount:",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.AccountBalanceWallet,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Total Amount",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                         Text(
                             text = "₹ $totalAmount",
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
 
-                // Professional Notes Input
+                // ── Note input ──
                 OutlinedTextField(
                     value = note,
                     onValueChange = {
@@ -670,12 +808,19 @@ private fun SaveCalculationDialog(
                         showError = false
                     },
                     label = { Text("Reference Note") },
-                    placeholder = { Text("e.g. Morning Collection, Sales...") },
+                    placeholder = { Text("e.g. Morning Collection, Sales…") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Notes,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     isError = showError,
                     supportingText = if (showError) {
-                        { Text("Required for identification", color = MaterialTheme.colorScheme.error) }
+                        { Text("A note is required for identification", color = MaterialTheme.colorScheme.error) }
                     } else null,
                     minLines = 2,
                     maxLines = 3,
@@ -685,31 +830,43 @@ private fun SaveCalculationDialog(
                     )
                 )
 
-                // Actions
+                // ── Action buttons ──
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(
+                    OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                     ) {
-                        Text("Cancel")
+                        Text("Cancel", fontWeight = FontWeight.SemiBold)
                     }
                     Button(
                         onClick = {
                             if (note.trim().isEmpty()) showError = true
                             else onSave(note.trim())
                         },
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                     ) {
-                        Text("Save Now")
+                        Icon(
+                            Icons.Default.Save,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Save Now", fontWeight = FontWeight.ExtraBold)
                     }
                 }
             }
         }
     }
 }
-
